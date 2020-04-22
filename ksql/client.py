@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import requests
+import requests, json, re
+import pandas as pd
 
 from ksql.api import SimplifiedAPI
 
@@ -86,3 +87,46 @@ class KSQLAPI(object):
                                         conditions=conditions,
                                         partition_by=partition_by,
                                         **kwargs)
+
+    def stream_to_pandas(self, stream, startDt='', endDt='', dtFormat='yyyy-MM-dd HH:mm:ss', limit=0, timeout=None):
+        sql = "SELECT * FROM " + stream
+        if startDt != '' or endDt != '':
+            sql = sql + "\nWHERE "
+        if startDt != '':
+            sql = sql + "ROWTIME >= STRINGTOTIMESTAMP('" + startDt + "', '" + dtFormat + "')"
+        if endDt != '':
+            if startDt != '':
+                sql = sql + "\nAND "
+            sql = sql + "ROWTIME <= STRINGTOTIMESTAMP('" + endDt+ "', '" + dtFormat + "')"
+        sql = sql + "\nEMIT CHANGES"
+        if limit > 0:
+            sql = sql + '\nLIMIT ' + str(limit)
+        sql = sql + ';'
+        print('KSQL:\n' + sql)
+
+        properties = {}
+        if startDt != '' or endDt != '':
+            properties['auto.offset.reset'] = 'earliest'
+
+        result = self.query(sql, stream_properties=properties, idle_timeout=timeout)
+        print('\nStart loading stream data...')
+
+        count = 0;
+        header = [];
+        rows = [];
+
+        try:
+            for record in result:
+                r = json.loads(record)
+                if 'header' in r:
+                    header = re.findall(r'`(.*?)`', r['header']['schema'])
+                elif 'row' in r:
+                    rows.append(r['row']['columns'])
+                count = count + 1
+                if count % 1000 == 0:
+                    print('Records: ' + str(count))
+            print('Finished by LIMIT')
+        except KeyboardInterrupt:
+            print('Finished by Ctrl-C')
+
+        return pd.DataFrame(rows, columns=header)
