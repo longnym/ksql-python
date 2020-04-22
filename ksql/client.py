@@ -102,7 +102,7 @@ class KSQLAPI(object):
         if limit > 0:
             sql = sql + '\nLIMIT ' + str(limit)
         sql = sql + ';'
-        print('KSQL:\n' + sql)
+        print('[KSQL]\n' + sql)
 
         properties = {}
         if startDt != '' or endDt != '':
@@ -129,4 +129,6 @@ class KSQLAPI(object):
         except KeyboardInterrupt:
             print('Finished by Ctrl-C')
 
-        return pd.DataFrame(rows, columns=header)
+        df = pd.DataFrame(rows, columns=header)
+        df['ROWTIME'] = pd.to_datetime(df['ROWTIME'], unit='ms')
+        return df
