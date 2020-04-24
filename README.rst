@@ -22,7 +22,7 @@ Or
 
 .. code:: bash
 
-    git clone https://github.com/bryanyang0528/ksql-python
+    git clone https://github.com/longnym/ksql-python
     cd ksql-python
     python setup.py install
 
